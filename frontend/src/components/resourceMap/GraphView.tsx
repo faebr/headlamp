@@ -16,6 +16,8 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import CRD from '../../lib/k8s/crd';
+import { useNamespaces } from '../../redux/filterSlice';
 import { useTypedSelector } from '../../redux/reducers/reducers';
 import { NamespacesAutocomplete } from '../common';
 import { GraphNodeDetails } from './details/GraphNodeDetails';
@@ -35,7 +37,7 @@ import { GraphRenderer } from './GraphRenderer';
 import { NodeHighlight, useNodeHighlight } from './NodeHighlight';
 import { ResourceSearch } from './search/ResourceSearch';
 import { SelectionBreadcrumbs } from './SelectionBreadcrumbs';
-import { allSources, GraphSourceManager, useSources } from './sources/GraphSources';
+import { getAllSources, GraphSourceManager, useSources } from './sources/GraphSources';
 import { GraphSourcesView } from './sources/GraphSourcesView';
 import { useGraphViewport } from './useGraphViewport';
 import { useQueryParamsState } from './useQueryParamsState';
@@ -62,6 +64,9 @@ interface GraphViewContentProps {
 
   /** Default filters to apply */
   defaultFilters?: GraphFilter[];
+
+  /** List of CRDs */
+  crds?: CRD[];
 }
 
 const defaultFiltersValue: GraphFilter[] = [];
@@ -69,8 +74,9 @@ const defaultFiltersValue: GraphFilter[] = [];
 function GraphViewContent({
   height,
   defaultNodeSelection,
-  defaultSources = allSources,
+  defaultSources = getAllSources(),
   defaultFilters = defaultFiltersValue,
+  crds,
 }: GraphViewContentProps) {
   const { t } = useTranslation();
 
@@ -225,6 +231,7 @@ function GraphViewContent({
                 selectedSources={selectedSources}
                 toggleSource={toggleSelection}
                 sourceData={sourceData ?? new Map()}
+                crds={crds}
               />
 
               {namespaces.size !== 1 && (
@@ -237,6 +244,12 @@ function GraphViewContent({
 
               <ChipToggleButton
                 label={t('Group By: {{ name }}', { name: t('Instance') })}
+                isActive={groupBy === 'instance'}
+                onClick={() => setGroupBy(groupBy === 'instance' ? undefined : 'instance')}
+              />
+
+              <ChipToggleButton
+                label={t('Group By: {{ name }}', { name: t('CRD') })}
                 isActive={groupBy === 'instance'}
                 onClick={() => setGroupBy(groupBy === 'instance' ? undefined : 'instance')}
               />
@@ -385,11 +398,16 @@ function CustomThemeProvider({ children }: { children: ReactNode }) {
  * @returns
  */
 export function GraphView(props: GraphViewContentProps) {
+  const { items: crds } = CRD.useList({ namespace: useNamespaces() });
+
+  // Ensure crds is either an array or undefined
+  const crdsArray = crds ?? undefined;
+
   return (
     <StrictMode>
       <ReactFlowProvider>
-        <GraphSourceManager sources={props.defaultSources ?? allSources}>
-          <GraphViewContent {...props} />
+        <GraphSourceManager sources={props.defaultSources ?? getAllSources()}>
+          <GraphViewContent {...props} crds={crdsArray} />
         </GraphSourceManager>
       </ReactFlowProvider>
     </StrictMode>

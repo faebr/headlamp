@@ -10,20 +10,30 @@ import {
   useState,
 } from 'react';
 import { KubeObject } from '../../../lib/k8s/cluster';
+import CRD from '../../../lib/k8s/crd';
+import { useNamespaces } from '../../../redux/filterSlice';
 import { GraphEdge, GraphNode, GraphSource } from '../graph/graphModel';
 import { configurationSource } from './definitions/configurationSource';
+import { crdSource } from './definitions/crdSource';
 import { networkSource } from './definitions/networkSource';
 import { securitySource } from './definitions/securitySource';
 import { storageSource } from './definitions/storageSource';
 import { workloadsSource } from './definitions/workloadSource';
 
-export const allSources: GraphSource[] = [
-  workloadsSource,
-  storageSource,
-  networkSource,
-  securitySource,
-  configurationSource,
-];
+export function getAllSources(): GraphSource[] {
+  const { items: crds } = CRD.useList({ namespace: useNamespaces() });
+  if (crds == null) {
+    return [workloadsSource, storageSource, networkSource, securitySource, configurationSource];
+  }
+  return [
+    workloadsSource,
+    storageSource,
+    networkSource,
+    securitySource,
+    configurationSource,
+    crdSource(crds),
+  ];
+}
 
 /**
  * Map of nodes and edges where the key is source id
