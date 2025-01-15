@@ -16,8 +16,6 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import CRD from '../../lib/k8s/crd';
-import { useNamespaces } from '../../redux/filterSlice';
 import { useTypedSelector } from '../../redux/reducers/reducers';
 import { NamespacesAutocomplete } from '../common';
 import { GraphNodeDetails } from './details/GraphNodeDetails';
@@ -64,9 +62,6 @@ interface GraphViewContentProps {
 
   /** Default filters to apply */
   defaultFilters?: GraphFilter[];
-
-  /** List of CRDs */
-  crds?: CRD[];
 }
 
 const defaultFiltersValue: GraphFilter[] = [];
@@ -76,7 +71,6 @@ function GraphViewContent({
   defaultNodeSelection,
   defaultSources = getAllSources(),
   defaultFilters = defaultFiltersValue,
-  crds,
 }: GraphViewContentProps) {
   const { t } = useTranslation();
 
@@ -231,7 +225,6 @@ function GraphViewContent({
                 selectedSources={selectedSources}
                 toggleSource={toggleSelection}
                 sourceData={sourceData ?? new Map()}
-                crds={crds}
               />
 
               {namespaces.size !== 1 && (
@@ -398,16 +391,11 @@ function CustomThemeProvider({ children }: { children: ReactNode }) {
  * @returns
  */
 export function GraphView(props: GraphViewContentProps) {
-  const { items: crds } = CRD.useList({ namespace: useNamespaces() });
-
-  // Ensure crds is either an array or undefined
-  const crdsArray = crds ?? undefined;
-
   return (
     <StrictMode>
       <ReactFlowProvider>
         <GraphSourceManager sources={props.defaultSources ?? getAllSources()}>
-          <GraphViewContent {...props} crds={crdsArray} />
+          <GraphViewContent {...props} />
         </GraphSourceManager>
       </ReactFlowProvider>
     </StrictMode>
