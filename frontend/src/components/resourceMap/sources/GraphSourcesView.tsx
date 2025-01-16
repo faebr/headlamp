@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { memo, useState } from 'react';
 import { GraphSource } from '../graph/graphModel';
-import { SourceData } from './GraphSources';
+import { getFlatSources,SourceData } from './GraphSources';
 
 const Node = styled('div')(() => ({
   display: 'flex',
@@ -48,8 +48,8 @@ function GraphSourceView({
   source,
   sourceData,
   selection,
-  activeItemId,
-  setActiveItemId,
+  activeItemIds,
+  toggleActiveItemIds,
   toggleSelection,
 }: {
   /** Source definition */
@@ -58,16 +58,18 @@ function GraphSourceView({
   sourceData: SourceData;
   /** Set of selected source ids */
   selection: Set<string>;
-  /** Active (exapnded) source */
-  activeItemId: string | undefined;
+  /** Active (expanded) source */
+  activeItemIds: string[];
   toggleSelection: (source: GraphSource) => void;
-  setActiveItemId: (id: string | undefined) => void;
+  toggleActiveItemIds: (add: boolean, id: string) => void;
 }) {
   const hasChildren = 'sources' in source;
   const isSelected = (source: GraphSource): boolean =>
     'sources' in source ? source.sources.every(s => isSelected(s)) : selection.has(source.id);
   const isChecked = isSelected(source);
-  const intermediate = 'sources' in source && source.sources.some(s => isSelected(s)) && !isChecked;
+
+  const intermediate =
+    'sources' in source && getFlatSources(source.sources).some(s => isSelected(s)) && !isChecked;
 
   const data = sourceData.get(source.id);
 
@@ -113,18 +115,18 @@ function GraphSourceView({
     );
   }
 
-  const isActive = source.id === activeItemId;
+  const isActive = activeItemIds.includes(source.id);
 
   return (
     <Node>
       <NodeHeader
         role="button"
         tabIndex={0}
-        onClick={() => setActiveItemId(isActive ? undefined : source.id)}
+        onClick={() => toggleActiveItemIds(!isActive, source.id)}
         onKeyDown={e => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            setActiveItemId(isActive ? undefined : source.id);
+            toggleActiveItemIds(!isActive, source.id);
           }
         }}
       >
@@ -139,7 +141,7 @@ function GraphSourceView({
       </NodeHeader>
 
       <Stack ml={3}>
-        {source.id === activeItemId &&
+        {activeItemIds.includes(source.id) &&
           source.sources?.map(source => (
             <GraphSourceView
               source={source}
@@ -147,8 +149,8 @@ function GraphSourceView({
               toggleSelection={toggleSelection}
               key={source.id}
               sourceData={sourceData}
-              activeItemId={activeItemId}
-              setActiveItemId={setActiveItemId}
+              activeItemIds={activeItemIds}
+              toggleActiveItemIds={toggleActiveItemIds}
             />
           ))}
       </Stack>
@@ -170,7 +172,7 @@ export interface GraphSourcesViewProps {
 export const GraphSourcesView = memo(
   ({ sources, sourceData, selectedSources, toggleSource }: GraphSourcesViewProps) => {
     const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
-    const [activeItemId, setActiveItemId] = useState<string | undefined>(undefined);
+    const [activeItemIds, toggleActiveItemIds] = useState<string[]>([]);
 
     const selected = sources.filter(source => {
       const isSelected = selectedSources.has(source.id);
@@ -208,7 +210,7 @@ export const GraphSourcesView = memo(
           anchorEl={anchorEl}
           open={Boolean(anchorEl)}
         >
-          <Box sx={{ display: 'flex', flexDirection: 'column', width: '300px', padding: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', width: '350px', padding: 1.5 }}>
             {sources.map((source, index) => (
               <GraphSourceView
                 source={source}
@@ -216,8 +218,22 @@ export const GraphSourcesView = memo(
                 toggleSelection={toggleSource}
                 key={index}
                 sourceData={sourceData}
-                activeItemId={activeItemId}
-                setActiveItemId={id => setActiveItemId(id)}
+                activeItemIds={activeItemIds}
+                toggleActiveItemIds={(add, id) => {
+                  let clone: string[] = [];
+
+                  for (const activeItemId of activeItemIds) {
+                    clone.push(activeItemId);
+                  }
+
+                  if (add) {
+                    clone.push(id);
+                  } else {
+                    const firstIdx = clone.indexOf(id);
+                    clone = clone.slice(0, firstIdx);
+                  }
+                  toggleActiveItemIds(clone);
+                }}
               />
             ))}
           </Box>

@@ -6,12 +6,12 @@ import { KubeIcon } from '../../kubeIcon/KubeIcon';
 import { kubeOwnersEdgesReversed, makeKubeObjectNode } from '../GraphSources';
 
 export function crdSource(crds: CRD[]): GraphSource {
-  const sources: GraphSource[] = [];
+  const groupedSources = new Map<string, GraphSource[]>();
 
   for (const crd of crds) {
-    sources.push({
+    const source = {
       id: 'cr-' + crd.getName(),
-      label: crd.getName(),
+      label: crd.spec.names.kind,
       icon: <KubeIcon kind="CustomResourceDefinition" />,
       useData: () => {
         const crClass = crd.makeCRClass();
@@ -31,13 +31,31 @@ export function crdSource(crds: CRD[]): GraphSource {
           };
         }, [crInstances, error]);
       },
-    });
+    };
+
+    if (!groupedSources.has(crd.spec.group)) {
+      groupedSources.set(crd.spec.group, []);
+    }
+
+    groupedSources.get(crd.spec.group)?.push(source);
   }
+
+  const finalSources: GraphSource[] = [];
+  groupedSources.forEach((sources, group) => {
+    finalSources.push({
+      id: 'crd-' + group,
+      label: group,
+      icon: <KubeIcon kind="CustomResourceDefinition" />,
+      sources: sources,
+    });
+  });
+
+  console.log(finalSources);
 
   return {
     id: 'crs',
     label: 'CRs',
     icon: <KubeIcon kind="CustomResourceDefinition" />,
-    sources: sources,
+    sources: finalSources,
   };
 }
