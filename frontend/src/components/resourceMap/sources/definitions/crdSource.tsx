@@ -173,6 +173,24 @@ function iterateCRDs() {
   return [createSource(crClass)]
 }*/
 
+const createCrdSources = (crds: CRD[]): GraphSource[] => {
+  console.log('createCrdSources');
+  console.log(crds);
+  const crdGraphSource: GraphSource = {
+    id: 'crd', //+ crd.metadata.name,
+    label: 'crd', //crd.metadata.name,
+    icon: <KubeIcon kind="CustomResourceDefinition" />,
+    useData: () => {
+      const edges: GraphEdge[] = [];
+      return {
+        nodes: crds.map(makeKubeObjectNode) ?? [],
+        edges,
+      };
+    },
+  };
+  return [crdGraphSource];
+};
+
 const createCrSources = (crds: CRD[]): GraphSource[] => {
   const dataClassCrds = crds.map(crd => {
     const crdClass = crd.makeCRClass();
@@ -235,5 +253,5 @@ export const crdSource = (crds: CRD[]): GraphSource => ({
   label: 'CRs',
   icon: <Icon icon="mdi:puzzle" width="100%" height="100%" color={getKindGroupColor('other')} />,
   // sources: getCrdSources(),
-  sources: [...createCrSources(crds)], //iterateCRDs(),
+  sources: [...createCrdSources(crds), ...createCrSources(crds)], //iterateCRDs(),
 });

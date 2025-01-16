@@ -243,8 +243,8 @@ function GraphViewContent({
 
               <ChipToggleButton
                 label={t('Group By: {{ name }}', { name: t('CRD') })}
-                isActive={groupBy === 'instance'}
-                onClick={() => setGroupBy(groupBy === 'instance' ? undefined : 'instance')}
+                isActive={groupBy === 'crd'}
+                onClick={() => setGroupBy(groupBy === 'crd' ? undefined : 'crd')}
               />
 
               <ChipToggleButton

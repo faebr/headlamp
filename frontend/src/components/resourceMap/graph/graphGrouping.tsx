@@ -11,7 +11,7 @@ import {
   KubeObjectNode,
 } from './graphModel';
 
-export type GroupBy = 'node' | 'namespace' | 'instance';
+export type GroupBy = 'node' | 'namespace' | 'instance' | 'crd';
 
 /**
  * Returns the amount of nodes in the graph
@@ -255,6 +255,25 @@ export function groupGraph(
         return undefined;
       },
       { label: 'Instance' }
+    );
+  }
+
+  if (groupBy === 'crd') {
+    // Create groups based on the Kube resource namespace
+    components = groupByProperty(
+      components,
+      component => {
+        if (component.type === 'kubeGroup') {
+          return component.data.nodes[0].data.resource.kind;
+        }
+        if (component.type === 'group') {
+          return null;
+        }
+        if (component.type === 'kubeObject') {
+          return component.data.resource.kind;
+        }
+      },
+      { label: 'CRD', allowSingleMemberGroup: true }
     );
   }
 
