@@ -1,8 +1,9 @@
+import { Icon } from '@iconify/react';
 import { useMemo } from 'react';
 import CRD from '../../../../lib/k8s/crd';
 import { useNamespaces } from '../../../../redux/filterSlice';
 import { GraphSource } from '../../graph/graphModel';
-import { KubeIcon } from '../../kubeIcon/KubeIcon';
+import { getKindGroupColor, KubeIcon } from '../../kubeIcon/KubeIcon';
 import { kubeOwnersEdgesReversed, makeKubeObjectNode } from '../GraphSources';
 
 export function crdSource(crds: CRD[]): GraphSource {
@@ -12,7 +13,14 @@ export function crdSource(crds: CRD[]): GraphSource {
     const source = {
       id: 'cr-' + crd.getName(),
       label: crd.spec.names.kind,
-      icon: <KubeIcon kind="CustomResourceDefinition" />,
+      icon: (
+        <Icon
+          icon="mdi:select-group"
+          width="100%"
+          height="100%"
+          color={getKindGroupColor('other')}
+        />
+      ),
       useData: () => {
         const crClass = crd.makeCRClass();
         const [crInstances, error] = crClass.useList({
@@ -45,7 +53,7 @@ export function crdSource(crds: CRD[]): GraphSource {
     finalSources.push({
       id: 'crd-' + group,
       label: group,
-      icon: <KubeIcon kind="CustomResourceDefinition" />,
+      icon: <Icon icon="mdi:group" width="100%" height="100%" color={getKindGroupColor('other')} />,
       sources: sources,
     });
   });
