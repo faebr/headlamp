@@ -136,7 +136,6 @@ function GraphViewContent({
 
     return { visibleGraph, fullGraph: graph };
   }, [filteredGraph, groupBy, selectedNodeId, expandAll]);
-
   const viewport = useGraphViewport();
 
   useEffect(() => {

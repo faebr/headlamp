@@ -18,18 +18,15 @@ export type GroupBy = 'node' | 'namespace' | 'instance' | 'crd';
  */
 export const getGraphSize = (graph: GraphNode) => {
   let size = 0;
-
   forEachNode(graph, () => {
     size++;
   });
-
   return size;
 };
 
 /**
  * Identifies and groups connected components from a set of nodes and edges.
- * Connected component is a subgraph where all nodes are connected to each other
- * but not to any other node in the graph. Essentialy a separate subgraph
+ * Unlike a pure tree/forest approach, this version preserves loops (cycles).
  *
  * @param nodes - An array of `KubeObjectNode` representing the nodes in the graph
  * @param edges - An array of `GraphEdge` representing the edges in the graph
@@ -38,19 +35,17 @@ export const getGraphSize = (graph: GraphNode) => {
  */
 const getConnectedComponents = (nodes: KubeObjectNode[], edges: GraphEdge[]): GraphNode[] => {
   const components: KubeGroupNode[] = [];
-
   const graphLookup = makeGraphLookup(nodes, edges);
 
   const visitedNodes = new Set<string>();
+  // Used to avoid inserting the same edge into the component multiple times
   const visitedEdges = new Set<string>();
 
   /**
-   * Recursively finds all nodes in the connected component of a given node
-   * This function performs a depth-first search (DFS) to traverse and collect all nodes
-   * that are part of the same connected component as the provided node
-   *
-   * @param node - The starting node for the connected component search
-   * @param componentNodes - An array to store the nodes that are part of the connected component
+   * Recursively traverses the graph from `node`, collecting both nodes and edges
+   * into the same connected component. We do NOT remove loops/cycles. If we reach
+   * a node that is already visited, we simply do NOT recurse further, but we still
+   * add that edge to `componentEdges`.
    */
   const findConnectedComponent = (
     node: KubeObjectNode,
@@ -60,30 +55,30 @@ const getConnectedComponents = (nodes: KubeObjectNode[], edges: GraphEdge[]): Gr
     visitedNodes.add(node.id);
     componentNodes.push(node);
 
+    // Handle outgoing edges
     graphLookup.getOutgoingEdges(node.id)?.forEach(edge => {
-      if (visitedNodes.has(edge.target)) return;
-
+      // Always include this edge if we haven't already
       if (!visitedEdges.has(edge.id)) {
         visitedEdges.add(edge.id);
         componentEdges.push(edge);
       }
-
+      // Only recurse if the target node hasn't been visited
       const targetNode = graphLookup.getNode(edge.target);
-      if (targetNode) {
+      if (targetNode && !visitedNodes.has(targetNode.id)) {
         findConnectedComponent(targetNode, componentNodes, componentEdges);
       }
     });
 
+    // Handle incoming edges
     graphLookup.getIncomingEdges(node.id)?.forEach(edge => {
-      if (visitedNodes.has(edge.source)) return;
-
+      // Always include this edge if we haven't already
       if (!visitedEdges.has(edge.id)) {
         visitedEdges.add(edge.id);
         componentEdges.push(edge);
       }
-
+      // Only recurse if the source node hasn't been visited
       const sourceNode = graphLookup.getNode(edge.source);
-      if (sourceNode) {
+      if (sourceNode && !visitedNodes.has(sourceNode.id)) {
         findConnectedComponent(sourceNode, componentNodes, componentEdges);
       }
     });
@@ -95,11 +90,12 @@ const getConnectedComponents = (nodes: KubeObjectNode[], edges: GraphEdge[]): Gr
       const componentNodes: KubeObjectNode[] = [];
       const componentEdges: GraphEdge[] = [];
       findConnectedComponent(node, componentNodes, componentEdges);
-      const mainNode = getMainNode(componentNodes);
 
+      const mainNode = getMainNode(componentNodes);
       const id = 'group-' + mainNode.id;
+
       components.push({
-        id: id,
+        id,
         type: 'kubeGroup',
         data: {
           label: mainNode.data.resource.metadata.name,
@@ -110,7 +106,8 @@ const getConnectedComponents = (nodes: KubeObjectNode[], edges: GraphEdge[]): Gr
     }
   });
 
-  return components.map(it => (it.data.nodes.length === 1 ? it.data.nodes[0] : it));
+  // If a group only has one node, return just the single node instead of a kubeGroup
+  return components.map(group => (group.data.nodes.length === 1 ? group.data.nodes[0] : group));
 };
 
 /**
@@ -129,7 +126,7 @@ export const getMainNode = (nodes: KubeObjectNode[]) => {
 
 /**
  * Groups a list of nodes into 'group' type nodes
- * Groping property is determined by the accessor
+ * Grouping property is determined by the accessor
  *
  * @param nodes - list of nodes
  * @param accessor - function returning which property to group by
@@ -168,6 +165,7 @@ const groupByProperty = (
     const nonGroup = it.id.includes('undefined');
     const hasOneMember = it.data.nodes.length === 1;
 
+    // If property is 'undefined' or group has only one node, we might just return the node(s) instead
     return nonGroup || (hasOneMember && !allowSingleMemberGroup) ? it.data.nodes : [it];
   });
 
@@ -179,9 +177,9 @@ const groupByProperty = (
  * Nodes within groups are sorted by size
  *
  * @param nodes - List of nodes
- * @param edges - List of edge
+ * @param edges - List of edges
  * @param params.groupBy - group by which property
- * @returns Graph, a single root node with groups as its' children
+ * @returns Graph, a single root node with groups as its children
  */
 export function groupGraph(
   nodes: KubeObjectNode[],
@@ -198,7 +196,9 @@ export function groupGraph(
     },
   };
 
+  // Now preserves loops because we don’t skip edges that form cycles
   let components: GraphNode[] = getConnectedComponents(nodes, edges);
+  console.log('components:', components);
 
   if (groupBy === 'namespace') {
     // Create groups based on the Kube resource namespace
@@ -220,7 +220,7 @@ export function groupGraph(
   }
 
   if (groupBy === 'node') {
-    // Create groups based on the Kube resource node
+    // Create groups based on the Kube resource node (i.e. Pod.spec.nodeName)
     components = groupByProperty(
       components,
       component => {
@@ -259,7 +259,7 @@ export function groupGraph(
   }
 
   if (groupBy === 'crd') {
-    // Create groups based on the Kube resource namespace
+    // Create groups based on the Kube resource kind
     components = groupByProperty(
       components,
       component => {
@@ -277,13 +277,11 @@ export function groupGraph(
     );
   }
 
+  // Add all components (groups or single nodes) under the root
   root.data.nodes.push(...components);
 
   // Sort nodes within each group node
   forEachNode(root, node => {
-    /**
-     * Sort elements, giving priority to bigger groups
-     */
     const getNodeWeight = (n: GraphNode) => {
       if (n.type === 'group') {
         return 100 + n.data.nodes.length;
@@ -293,14 +291,16 @@ export function groupGraph(
       }
       return 1;
     };
-    'nodes' in node.data && node.data?.nodes?.sort((a, b) => getNodeWeight(b) - getNodeWeight(a));
+    if ('nodes' in node.data) {
+      node.data?.nodes?.sort((a, b) => getNodeWeight(b) - getNodeWeight(a));
+    }
   });
 
   return root;
 }
 
 /**
- * Walks the graph do find the parent of the given node
+ * Walks the graph to find the parent of the given node
  */
 export function getParentNode(graph: GraphNode, elementId: string): GraphNode | undefined {
   let result: GraphNode | undefined;
@@ -326,10 +326,10 @@ export function findGroupContaining(graph: GraphNode, elementId: string): GraphN
   // Not a group
   if (!isGroup(graph)) return undefined;
 
-  // Group is actually selcted, not a node inside a group
+  // The group itself is selected
   if (graph.id === elementId) return graph;
 
-  // Node is inside this group
+  // Node is inside this group?
   if (graph.data.nodes.find(it => it.id === elementId && !isGroup(it))) {
     return graph;
   }
@@ -353,15 +353,16 @@ export function findGroupContaining(graph: GraphNode, elementId: string): GraphN
 }
 
 /**
- * Given a graph with groups, this function will 'collapse' all groups without
- * the selected node. 'Collapsing' means that group won't show all children but
- * only a preview
+ * Given a graph with groups, this function will 'collapse' all groups that
+ * do not contain the selected node. 'Collapsing' means that group won't show
+ * all children but only a preview.
  *
- * If selectedNodeId is passed, only shows group containing that node
+ * If selectedNodeId is passed, only shows the group containing that node.
  *
- * @param graph Single graph node
- * @param params.selectedNodeId Graph node that is selected
- * @param params.expandAll Display all the children within all groups
+ * @param graph         A single graph node (root or group)
+ * @param params        Collapse params
+ * @param params.selectedNodeId Node that is selected
+ * @param params.expandAll       Display all the children within all groups
  * @returns Collapsed graph
  */
 export function collapseGraph(
@@ -376,13 +377,12 @@ export function collapseGraph(
   }
 
   /**
-   * Recursively collapse graph starting from a given Node
-   * Hides children if necessary
-   * @param group - given Node
-   * @returns Collapsed node
+   * Recursively collapse children
    */
   const collapseGroup = (group: GraphNode): GraphNode => {
-    if (group.type !== 'kubeGroup' && group.type !== 'group') return group;
+    if (group.type !== 'kubeGroup' && group.type !== 'group') {
+      return group;
+    }
 
     const collapsed = expandAll
       ? false
@@ -399,6 +399,7 @@ export function collapseGraph(
     } as GraphNode;
   };
 
+  // If we do have a selected group and it’s not the root, shrink everything else
   if (selectedGroup && selectedGroup.id !== 'root') {
     root.data = {
       ...root.data,
@@ -407,6 +408,5 @@ export function collapseGraph(
   }
 
   root = collapseGroup(root) as GroupNode;
-
   return root;
 }

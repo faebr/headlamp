@@ -102,6 +102,25 @@ export const kubeOwnersEdgesReversed = (obj: KubeObject): GraphEdge[] => {
 };
 
 /**
+ * Create Edges from object's ownerReferences
+ */
+export const sourceRefEdges = (obj: KubeObject): GraphEdge[] => {
+  if (obj.metadata.labels?.['app.headlamp.dev/source-ref']) {
+    return [
+      {
+        id: `ref-${obj.metadata.labels?.['app.headlamp.dev/source-ref']}-${obj.metadata.uid}`,
+        type: 'default',
+        source: obj.metadata.labels?.['app.headlamp.dev/source-ref'],
+        target: obj.metadata.uid,
+        label: 'source-ref',
+        animated: true,
+      },
+    ];
+  }
+  return [];
+};
+
+/**
  * Create an object from any Kube object
  */
 export const makeKubeObjectNode = (obj: KubeObject): GraphNode => ({

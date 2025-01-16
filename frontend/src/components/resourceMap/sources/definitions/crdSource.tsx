@@ -2,9 +2,9 @@ import { Icon } from '@iconify/react';
 import { useMemo } from 'react';
 import CRD from '../../../../lib/k8s/crd';
 import { useNamespaces } from '../../../../redux/filterSlice';
-import { GraphSource } from '../../graph/graphModel';
+import { GraphEdge, GraphSource } from '../../graph/graphModel';
 import { getKindGroupColor, KubeIcon } from '../../kubeIcon/KubeIcon';
-import { kubeOwnersEdgesReversed, makeKubeObjectNode } from '../GraphSources';
+import { kubeOwnersEdgesReversed, makeKubeObjectNode, sourceRefEdges } from '../GraphSources';
 
 export function crdSource(crds: CRD[]): GraphSource {
   const groupedSources = new Map<string, GraphSource[]>();
@@ -32,10 +32,11 @@ export function crdSource(crds: CRD[]): GraphSource {
             console.error('error:', error);
             return null;
           }
-
+          const kubeOwnerEdges = crInstances.map(kubeOwnersEdgesReversed).flat() ?? [];
+          const relationEdges: GraphEdge[] = crInstances.map(sourceRefEdges).flat() ?? [];
           return {
             nodes: crInstances.map(makeKubeObjectNode) ?? [],
-            edges: crInstances.map(kubeOwnersEdgesReversed).flat() ?? [],
+            edges: [...kubeOwnerEdges, ...relationEdges],
           };
         }, [crInstances, error]);
       },
