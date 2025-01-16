@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { memo, useState } from 'react';
 import { GraphSource } from '../graph/graphModel';
-import { getFlatSources,SourceData } from './GraphSources';
+import { getFlatSources, SourceData } from './GraphSources';
 
 const Node = styled('div')(() => ({
   display: 'flex',
@@ -177,7 +177,7 @@ export const GraphSourcesView = memo(
     const selected = sources.filter(source => {
       const isSelected = selectedSources.has(source.id);
       return 'sources' in source
-        ? source.sources.some(it => selectedSources.has(it.id))
+        ? getFlatSources(source.sources).some(it => selectedSources.has(it.id))
         : isSelected;
     });
     const selectedText =
