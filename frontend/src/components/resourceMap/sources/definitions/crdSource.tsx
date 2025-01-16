@@ -58,8 +58,6 @@ export function crdSource(crds: CRD[]): GraphSource {
     });
   });
 
-  console.log(finalSources);
-
   return {
     id: 'crs',
     label: 'CRs',
