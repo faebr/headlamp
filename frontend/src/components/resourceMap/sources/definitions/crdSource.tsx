@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
 import CRD from '../../../../lib/k8s/crd';
 import { useNamespaces } from '../../../../redux/filterSlice';
-import { GraphEdge, GraphSource } from '../../graph/graphModel';
+import { GraphSource } from '../../graph/graphModel';
 import { KubeIcon } from '../../kubeIcon/KubeIcon';
-import { makeKubeObjectNode } from '../GraphSources';
+import { kubeOwnersEdgesReversed, makeKubeObjectNode } from '../GraphSources';
 
 export function crdSource(crds: CRD[]): GraphSource {
   const sources: GraphSource[] = [];
@@ -24,10 +24,10 @@ export function crdSource(crds: CRD[]): GraphSource {
             console.error('error:', error);
             return null;
           }
-          const edges: GraphEdge[] = [];
+
           return {
             nodes: crInstances.map(makeKubeObjectNode) ?? [],
-            edges,
+            edges: crInstances.map(kubeOwnersEdgesReversed).flat() ?? [],
           };
         }, [crInstances, error]);
       },
